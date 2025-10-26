@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netflix Tracker (Full Stack Demo)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #e50914; /* Netflix Red */
+            text-align: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 25px;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 5px;
+        }
+        .user-info {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 20px;
+        }
+        .control-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        /* Forms and Inputs */
+        .form-control input, .form-control button {
+            padding: 10px;
+            margin-right: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .form-control button {
+            background-color: #5cb85c;
+            color: white;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s;
+        }
+        .form-control button:hover {
+            background-color: #4cae4c;
+        }
+
+        /* Lists */
+        #movie-list, #history-list {
+            list-style: none;
+            padding: 0;
+        }
+        .movie-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .movie-info {
+            flex-grow: 1;
+        }
+        .movie-title {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #333;
+        }
+        .movie-details {
+            font-size: 0.9em;
+            color: #777;
+        }
+        .movie-rating {
+            font-weight: bold;
+            color: #ff9800; /* Amber for rating */
+            margin-left: 10px;
+        }
+        .movie-actions, .rating-controls {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        /* Buttons */
+        .update-btn, .delete-btn, .rating-controls button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .update-btn {
+            background-color: #007bff;
+            color: white;
+        }
+        .delete-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        .rating-controls button {
+            background-color: #ff9800;
+            color: white;
+        }
+        .rating-input {
+            width: 50px;
+            text-align: center;
+        }
+        #history-pagination button {
+            margin: 5px;
+            padding: 8px 12px;
+            background-color: #00bcd4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Netflix Tracker Full Stack Demo</h1>
+
+        <div id="user-display" class="user-info">Loading active user...</div>
+
+        <div class="control-section">
+            <h2>Add New Movie</h2>
+            <div class="form-control">
+                <input type="text" id="new-title" placeholder="Title" required>
+                <input type="number" id="new-year" placeholder="Year" min="1800" max="2050" required>
+                <input type="text" id="new-genre" placeholder="Genre (Optional)">
+                <button onclick="createMovie()">Add Movie</button>
+            </div>
+        </div>
+
+        <div id="history-section" class="control-section">
+            <h2>Your Watch History (Active User)</h2>
+            <ul id="history-list">
+                </ul>
+            <div id="history-pagination"></div> 
+        </div>
+
+        <div class="control-section">
+            <h2>Movie Catalog</h2>
+            <ul id="movie-list">
+                <li>Loading movies...</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // --- API BASE URLs ---
+        const API_BASE = 'http://localhost:8080/api';
+        const API_MOVIES_URL = `${API_BASE}/movies`; 
+        const API_USERS_URL = `${API_BASE}/users`;
+        const API_HISTORY_URL = `${API_BASE}/history`;
+
+        let CURRENT_USER_ID = null;
+        let HISTORY_CURRENT_PAGE = 0; // Track the current page for history
+
+        // --- USER MANAGEMENT ---
+        async function fetchUsers() {
+            const userDisplay = document.getElementById('user-display');
+            try {
+                const response = await fetch(API_USERS_URL);
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                
+                const users = await response.json();
+                
+                if (users.length === 0) {
+                    userDisplay.innerHTML = 'No users found. Please create a user in the database first.';
+                    return;
+                }
+                
+                // Use the first user as the active user for this demo
+                const user = users[0];
+                CURRENT_USER_ID = user.userId;
+                userDisplay.innerHTML = `Active User: ${user.name} (ID: ${user.userId})`;
+                
+                // Once user is loaded, fetch movies and history
+                fetchMovies();
+                fetchHistory(0); // Start by fetching the first page of history
+
+            } catch (error) {
+                console.error('Failed to fetch users:', error);
+                userDisplay.innerHTML = 'Error loading users. Is the API running and connected to MySQL?';
+            }
+        }
+
+        // --- MOVIE CRUD FUNCTIONS ---
+        async function fetchMovies() {
+            const listElement = document.getElementById('movie-list');
+            listElement.innerHTML = '<li>Loading movies...</li>';
+
+            try {
+                // Fetch the first 10 movies sorted by title
+                const response = await fetch(`${API_MOVIES_URL}?page=0&size=10&sort=title,asc`);
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                
+                const pageData = await response.json();
+                const movies = pageData.content; 
+
+                listElement.innerHTML = ''; 
+
+                if (movies.length === 0) {
+                    listElement.innerHTML = '<li>No movies found in the catalog.</li>';
+                    return;
+                }
+
+                movies.forEach(movie => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'movie-item';
+                    listItem.innerHTML = `
+                        <div class="movie-info">
+                            <div class="movie-title">${movie.title}</div>
+                            <div class="movie-rating">Average Rating: ${movie.ratingAvg ? movie.ratingAvg.toFixed(2) : 'N/A'}</div>
+                            <div class="movie-details">
+                                Year: ${movie.releaseYear} | Genre: ${movie.genre || 'Unknown'} | ID: ${movie.movieId}
+                            </div>
+                        </div>
+                        <div class="rating-controls">
+                            <input type="number" id="rating-input-${movie.movieId}" class="rating-input" placeholder="1-5" min="1" max="5">
+                            <button onclick="addRating(${movie.movieId})">Rate</button>
+                        </div>
+                        <div class="movie-actions">
+                            <button class="update-btn" onclick="updateMoviePrompt(${movie.movieId}, '${movie.title}', ${movie.releaseYear}, '${movie.genre}')">Update</button>
+                            <button class="delete-btn" onclick="deleteMovie(${movie.movieId})">Delete</button>
+                        </div>
+                    `;
+                    listElement.appendChild(listItem);
+                });
+
+            } catch (error) {
+                console.error('Failed to fetch movies:', error);
+                listElement.innerHTML = `<li>Error loading data. Is the Spring Boot server running?</li>`;
+            }
+        }
+        
+        async function createMovie() {
+            const title = document.getElementById('new-title').value;
+            const year = document.getElementById('new-year').value;
+            const genre = document.getElementById('new-genre').value;
+
+            if (!title || !year) {
+                alert('Title and Year are required.');
+                return;
+            }
+
+            try {
+                const response = await fetch(API_MOVIES_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: title,
+                        releaseYear: parseInt(year),
+                        genre: genre || null // Send null if optional field is empty
+                    })
+                });
+
+                if (response.status === 201) { 
+                    alert(`Movie "${title}" created successfully!`);
+                    document.getElementById('new-title').value = '';
+                    document.getElementById('new-year').value = '';
+                    document.getElementById('new-genre').value = '';
+                    fetchMovies(); // Refresh list
+                } else {
+                    const errorData = await response.json();
+                    alert(`Failed to create movie. Message: ${errorData.message || 'Server error.'}`);
+                }
+
+            } catch (error) {
+                alert('Could not connect to the API to create the movie.');
+            }
+        }
+
+        async function updateMoviePrompt(movieId, currentTitle, currentYear, currentGenre) {
+            const newTitle = prompt(`Enter new Title for Movie ID ${movieId}:`, currentTitle);
+            if (newTitle === null) return;
+
+            const newYear = prompt(`Enter new Release Year for Movie ID ${movieId}:`, currentYear);
+            if (newYear === null || newTitle === '' || newYear === '' || isNaN(parseInt(newYear))) {
+                alert('Invalid input provided.');
+                return;
+            }
+            
+            const newGenre = prompt(`Enter new Genre for Movie ID ${movieId}:`, currentGenre || '');
+
+            try {
+                const response = await fetch(`${API_MOVIES_URL}/${movieId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        title: newTitle, 
+                        releaseYear: parseInt(newYear),
+                        genre: newGenre || null 
+                    })
+                });
+
+                if (response.status === 200) { 
+                    alert(`Movie ID ${movieId} updated successfully!`);
+                    fetchMovies();
+                } else {
+                    const errorData = await response.json();
+                    alert(`Failed to update movie. Message: ${errorData.message || 'Server error.'}`);
+                }
+
+            } catch (error) {
+                alert('Could not connect to the API to update the movie.');
+            }
+        }
+
+        async function deleteMovie(movieId) {
+            if (!confirm(`Are you sure you want to delete movie ID ${movieId}? This will also delete related watch history.`)) return;
+
+            try {
+                const response = await fetch(`${API_MOVIES_URL}/${movieId}`, { method: 'DELETE' });
+
+                if (response.status === 204) { 
+                    alert(`Movie ID ${movieId} deleted successfully.`);
+                    fetchMovies();
+                    fetchHistory(0); // Refresh history list as well
+                } else if (response.status === 404) {
+                     alert(`Error: Movie ID ${movieId} not found.`);
+                } else {
+                    const errorData = await response.json();
+                    alert(`Failed to delete movie. Message: ${errorData.message || 'Server error.'}`);
+                }
+
+            } catch (error) {
+                alert('Could not connect to the API to delete the movie.');
+            }
+        }
+        
+        // --- RATING / HISTORY MANAGEMENT ---
+
+        async function addRating(movieId) {
+            if (!CURRENT_USER_ID) { alert('No active user selected.'); return; }
+            
+            const rating = document.getElementById(`rating-input-${movieId}`).value;
+            const ratingInt = parseInt(rating);
+
+            if (isNaN(ratingInt) || ratingInt < 1 || ratingInt > 5) {
+                alert('Please enter a valid rating between 1 and 5.');
+                return;
+            }
+
+            try {
+                const response = await fetch(API_HISTORY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: CURRENT_USER_ID,
+                        movieId: movieId,
+                        rating: ratingInt
+                    })
+                });
+
+                if (response.status === 201) { 
+                    alert(`Rating of ${ratingInt} added for movie ${movieId}!`);
+                    document.getElementById(`rating-input-${movieId}`).value = '';
+                    fetchMovies(); // Refresh to update average rating
+                    fetchHistory(0); // Refresh history list
+                } else {
+                    // Check for existing rating error (optional)
+                    const errorData = await response.json();
+                    alert(`Failed to add rating. Message: ${errorData.message || 'Server error.'}`);
+                }
+
+            } catch (error) {
+                console.error('Error adding rating:', error);
+                alert('Could not connect to the API to add rating.');
+            }
+        }
+        
+        async function fetchHistory(page) {
+            if (!CURRENT_USER_ID) return;
+            HISTORY_CURRENT_PAGE = page;
+            const listElement = document.getElementById('history-list');
+            const paginationElement = document.getElementById('history-pagination');
+            
+            listElement.innerHTML = '<li>Loading history...</li>';
+            paginationElement.innerHTML = '';
+
+            try {
+                // Fetch history with pagination (5 items per page, sorted by most recent watch date)
+                const response = await fetch(`${API_HISTORY_URL}/user/${CURRENT_USER_ID}?page=${page}&size=5&sort=watchDate,desc`);
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                
+                const pageData = await response.json();
+                const historyRecords = pageData.content; 
+
+                listElement.innerHTML = '';
+
+                if (historyRecords.length === 0) {
+                    listElement.innerHTML = '<li>No watch history found for this user.</li>';
+                    return;
+                }
+
+                historyRecords.forEach(record => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'movie-item';
+                    
+                    // Format the date nicely
+                    const date = new Date(record.watchDate).toLocaleDateString('en-US', {
+                        year: 'numeric', month: 'short', day: 'numeric'
+                    });
+                    
+                    listItem.innerHTML = `
+                        <div class="movie-info">
+                            <div class="movie-title">
+                                ${record.movie.title} 
+                                <span class="movie-rating">Rated: ${record.rating} / 5</span>
+                            </div>
+                            <div class="movie-details">
+                                Watched on: ${date} | Record ID: ${record.watchId}
+                            </div>
+                        </div>
+                        <div class="movie-actions">
+                            <button class="delete-btn" onclick="deleteHistoryRecord(${record.watchId})">Remove</button>
+                        </div>
+                    `;
+                    listElement.appendChild(listItem);
+                });
+
+                // Pagination controls
+                if (pageData.totalPages > 1) {
+                    let nav = '';
+                    if (!pageData.first) {
+                        nav += `<button onclick="fetchHistory(${page - 1})">Previous</button>`;
+                    }
+                    nav += ` <span>Page ${pageData.number + 1} of ${pageData.totalPages}</span> `;
+                    if (!pageData.last) {
+                        nav += `<button onclick="fetchHistory(${page + 1})">Next</button>`;
+                    }
+                    paginationElement.innerHTML = nav;
+                }
+
+            } catch (error) {
+                console.error('Failed to fetch history:', error);
+                listElement.innerHTML = `<li>Error loading history.</li>`;
+            }
+        }
+
+        async function deleteHistoryRecord(watchId) {
+            if (!confirm(`Are you sure you want to delete history record ID ${watchId}?`)) return;
+
+            try {
+                const response = await fetch(`${API_HISTORY_URL}/${watchId}`, { method: 'DELETE' });
+
+                if (response.status === 204) { 
+                    alert(`Record ID ${watchId} deleted.`);
+                    // Refresh both history and movie list (to update average rating)
+                    fetchHistory(HISTORY_CURRENT_PAGE); 
+                    fetchMovies();
+                } else {
+                    const errorData = await response.json();
+                    alert(`Failed to delete record. Message: ${errorData.message || 'Server error.'}`);
+                }
+
+            } catch (error) {
+                alert('Could not connect to the API to delete the record.');
+            }
+        }
+
+        // Call the initial function when the page loads
+        fetchUsers();
+    </script>
+</body>
+</html>
