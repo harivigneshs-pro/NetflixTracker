@@ -125,7 +125,7 @@ public class WatchHistoryService {
     private void updateMovieAverageRating(Long movieId) {
         List<WatchHistory> movieRatings = historyRepository.findByMovieMovieId(movieId);
         
-        Double average = movieRatings.stream()
+        double average = movieRatings.stream()
                 .mapToInt(WatchHistory::getRating)
                 .average()
                 .orElse(0.0);
@@ -135,5 +135,19 @@ public class WatchHistoryService {
 
         movie.setRatingAvg(average);
         movieRepository.save(movie);
+    }
+
+    // -------------------------------------------------------------------
+    // ADDITIONAL READ
+    // -------------------------------------------------------------------
+    /**
+     * Retrieves all watch history records for a specific movie.
+     */
+    public List<WatchHistory> getHistoryByMovieId(Long movieId) {
+        // Validate movie existence
+        movieRepository.findById(movieId)
+                .orElseThrow(() -> new IllegalArgumentException("Movie not found with ID: " + movieId));
+
+        return historyRepository.findByMovieMovieId(movieId);
     }
 }

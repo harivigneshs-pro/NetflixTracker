@@ -12,4 +12,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Custom query method based on field name in the Entity (email).
     // Spring generates the SQL query: SELECT * FROM users WHERE email = ?
     User findByEmail(String email);
+
+    // Find user by exact name
+    User findByName(String name);
 }

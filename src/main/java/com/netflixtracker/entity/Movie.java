@@ -39,4 +39,17 @@ public class Movie {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
+// File: com.netflixtracker.entity.Movie.java (Add this constructor)
+
+public Movie(String title,String genre, Integer releaseYear) {
+    this.title = title;
+    this.releaseYear = releaseYear; // Matches the field name in the entity
+    this.genre = genre;
+    
+    // Set default values for other fields if not provided
+    this.ratingAvg = 0.0;
+    this.createdAt = LocalDateTime.now();
+    // Duration and contentType remain null unless specified
+}
+
 }

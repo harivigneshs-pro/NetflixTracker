@@ -2,6 +2,8 @@ package com.netflixtracker.controller;
 
 import com.netflixtracker.entity.WatchHistory;
 import com.netflixtracker.service.WatchHistoryService;
+import com.netflixtracker.dto.WatchRequestDto;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,19 +22,18 @@ public class WatchHistoryController {
         this.historyService = historyService;
     }
 
-    public record WatchRequest(Long userId, Long movieId, Integer rating) {}
-    public record RatingUpdate(Integer rating) {}
+    public static class RatingUpdate { public Integer rating; public Integer getRating(){return rating;} public void setRating(Integer r){this.rating=r;} }
 
 
     // Endpoint: POST /api/history (Create)
     @PostMapping
-    public ResponseEntity<WatchHistory> addWatchRecord(@RequestBody WatchRequest request) {
+    public ResponseEntity<WatchHistory> addWatchRecord(@Valid @RequestBody WatchRequestDto request) {
         try {
             // Keeping the try-catch here to explicitly return 400 Bad Request for invalid rating
             WatchHistory record = historyService.addWatchRecord(
-                request.userId(),
-                request.movieId(),
-                request.rating()
+                request.getUserId(),
+                request.getMovieId(),
+                request.getRating()
             );
             return new ResponseEntity<>(record, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
@@ -59,6 +60,13 @@ public class WatchHistoryController {
         // 3. Returns the paginated result
         return ResponseEntity.ok(historyPage); 
     }
+
+    // Endpoint: GET /api/history/movie/{id}
+    @GetMapping("/movie/{id}")
+    public ResponseEntity<List<WatchHistory>> getHistoryByMovie(@PathVariable("id") Long movieId) {
+        List<WatchHistory> history = historyService.getHistoryByMovieId(movieId);
+        return ResponseEntity.ok(history);
+    }
     
     // -------------------------------------------------------------------
     // UPDATE OPERATION
@@ -72,8 +80,8 @@ public class WatchHistoryController {
         try {
             // Keeping the try-catch here to explicitly return 400 Bad Request for invalid rating/ID
             WatchHistory updatedRecord = historyService.updateRating(
-                    watchId, 
-                    request.rating()
+                watchId,
+                request.getRating()
             );
             return ResponseEntity.ok(updatedRecord);
         } catch (IllegalArgumentException e) {

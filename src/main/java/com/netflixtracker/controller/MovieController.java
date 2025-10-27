@@ -50,6 +50,12 @@ public ResponseEntity<Page<Movie>> getAllMovies(Pageable pageable) {
         return movieService.getTopRatedMovies();
     }
 
+    // Extension Endpoint: GET /api/movies/top-watched
+    @GetMapping("/top-watched")
+    public List<Movie> getTopWatchedMovies() {
+        return movieService.getTopWatchedMovies();
+    }
+
     // Endpoint: PUT /api/movies/{id} (Update)
     @PutMapping("/{id}")
     public ResponseEntity<Movie> updateMovie(@PathVariable Long id, @RequestBody Movie movieDetails) {

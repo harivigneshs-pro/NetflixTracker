@@ -36,6 +36,13 @@ public class UserController {
         return userService.getAllUsers();
     }
     
+    // Endpoint: GET /api/users/search?name={name} (Find by name for login)
+    @GetMapping("/search")
+    public ResponseEntity<User> findByName(@RequestParam("name") String name) {
+        User user = userService.getUserByName(name);
+        return ResponseEntity.ok(user);
+    }
+    
     // Endpoint: GET /api/users/{id} (Read One)
     @GetMapping("/{id}")
     public ResponseEntity<User> getUserById(@PathVariable Long id) {

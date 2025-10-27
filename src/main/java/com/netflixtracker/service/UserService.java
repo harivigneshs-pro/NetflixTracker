@@ -47,6 +47,17 @@ public class UserService {
     }
 
     /**
+     * Returns a user by exact name match.
+     */
+    public User getUserByName(String name) {
+        User user = userRepository.findByName(name);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found with name: " + name);
+        }
+        return user;
+    }
+
+    /**
      * Updates an existing user's details.
      */
     public User updateUser(Long userId, User updatedDetails) {

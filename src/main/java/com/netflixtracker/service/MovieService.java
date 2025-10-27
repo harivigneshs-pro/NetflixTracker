@@ -56,6 +56,16 @@ public class MovieService {
     }
 
     /**
+     * Retrieves top watched movies (by watch count). Returns up to 5 by default.
+     */
+    public List<Movie> getTopWatchedMovies() {
+        // Use the WatchHistoryRepository aggregation to find top movie ids
+        List<Object[]> rows = historyRepository.findTopMoviesByWatchCount(org.springframework.data.domain.PageRequest.of(0,5));
+        List<Long> movieIds = rows.stream().map(r -> ((Number) r[0]).longValue()).toList();
+        return movieRepository.findAllById(movieIds);
+    }
+
+    /**
      * Searches for movies where the title contains the given keyword (case-insensitive).
      */
     public List<Movie> searchMoviesByTitle(String titleKeyword) {
